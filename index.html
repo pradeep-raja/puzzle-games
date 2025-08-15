@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Diamond Hunt — 5×5 (Manhattan Puzzle)</title>
+    <style>
+        :root {
+            --size: 5;
+            --cell: 72px;
+            --gap: 6px;
+        }
+
+        body {
+            font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            margin: 24px;
+            background: #f7f7fb;
+            color: #222;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 20px;
+        }
+
+        .wrap {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(var(--size), var(--cell));
+            grid-auto-rows: var(--cell);
+            gap: var(--gap);
+            background: #e9ecf5;
+            padding: var(--gap);
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+        }
+
+        .cell {
+            background: #fff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+
+        .cell:disabled {
+            cursor: not-allowed;
+            opacity: .7;
+        }
+
+        .cell .sub {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            font: 10px/1.1 monospace;
+            color: #667;
+            opacity: .9;
+        }
+
+        .cell.revealed {
+            background: #fef6d9;
+        }
+
+        .cell.candidate::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 2px dashed #9bb;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        .cell.hit {
+            background: #c7f7d1 !important;
+            animation: pop .4s ease;
+        }
+
+        .cell.miss {
+            background: #ffd6d6;
+            animation: pop .4s ease;
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(.98)
+            }
+
+            60% {
+                transform: scale(1.03)
+            }
+
+            100% {
+                transform: scale(1)
+            }
+        }
+
+        .panel {
+            min-width: 280px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .stat {
+            background: #f3f6ff;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .stat b {
+            display: block;
+            font-size: 16px;
+        }
+
+        .btn {
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: #3b82f6;
+            color: #fff;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn.secondary {
+            background: #eef2ff;
+            color: #243;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #445;
+            opacity: .9;
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .log {
+            margin-top: 10px;
+            max-height: 220px;
+            overflow: auto;
+            font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #eef2ff;
+            border-radius: 999px;
+            font-size: 11px;
+            margin-left: 6px;
+        }
+
+        td.no-clue {
+            background: #ffe5e5;
+        }
+
+        @keyframes diamondFound {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            60% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        td.hit {
+            background: gold;
+            animation: diamondFound 0.6s ease-out;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Diamond Hunt — 5×5</h1>
+    <div class="wrap">
+        <div id="board" class="board" role="grid" aria-label="5 by 5 board"></div>
+
+        <div class="panel">
+            <div class="row">
+                <button id="newGame" class="btn">New Game</button>
+                <button id="clearMarks" class="btn secondary" title="Clear revealed numbers but keep progress">Clear
+                    Numbers</button>
+            </div>
+
+            <div class="row toggle">
+                <input type="checkbox" id="guessMode" />
+                <label for="guessMode"><b>Guess mode</b> <span class="hint">(enabled after diamond is
+                        fixed)</span></label>
+            </div>
+
+            <div class="stats">
+                <div class="stat"><b id="clicks">0</b>Clicks</div>
+                <div class="stat"><b id="reveals">0</b>Clues shown</div>
+                <div class="stat"><b id="cands">25</b>Candidates</div>
+                <div class="stat"><b id="status">Unfixed</b>Status</div>
+            </div>
+
+            <div class="row">
+                <div class="hint">
+                    Rule: Each clue shows a distance <b>between N and max</b> (N=5), using Manhattan distance.
+                    Candidates narrow until one remains — then the diamond is fixed and you can guess!
+                </div>
+            </div>
+
+            <div class="log" id="log" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <script>
+
+        (function () {
+            const N = 5;
+            const boardEl = document.getElementById('board');
+            const clicksEl = document.getElementById('clicks');
+            const revealsEl = document.getElementById('reveals');
+            const candsEl = document.getElementById('cands');
+            const statusEl = document.getElementById('status');
+            const logEl = document.getElementById('log');
+            const guessModeEl = document.getElementById('guessMode');
+            const newGameBtn = document.getElementById('newGame');
+            const clearMarksBtn = document.getElementById('clearMarks');
+
+            let candidates = new Set();
+            let fixedDiamond = null;
+            let clicks = 0;
+            let reveals = 0;
+
+            const key = (r, c) => `${r},${c}`;
+            const parseKey = k => { const [r, c] = k.split(',').map(Number); return { r, c }; };
+            const manhattan = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
+
+            function setCellNumber(r, c, value, cls) {
+                const cell = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+                if (!cell) return;
+                cell.textContent = value;
+                if (cls) cell.classList.add(cls);
+            }
+
+            function farthestDistanceFrom(cell) {
+                const corners = [{ r: 0, c: 0 }, { r: 0, c: N - 1 }, { r: N - 1, c: 0 }, { r: N - 1, c: N - 1 }];
+                let maxd = 0;
+                for (const p of corners) maxd = Math.max(maxd, manhattan(cell, p));
+                return maxd;
+            }
+
+            function cellsAtDistanceFrom(cell, dist, domain = null) {
+                const acc = [];
+                const pool = domain ? [...domain].map(parseKey) : allCells();
+                for (const p of pool) if (manhattan(cell, p) === dist) acc.push(p);
+                return acc;
+            }
+
+            function allCells() {
+                const out = [];
+                for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) out.push({ r, c });
+                return out;
+            }
+
+            function randChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+            function init() {
+                boardEl.style.setProperty('--size', N);
+                boardEl.innerHTML = '';
+                for (let r = 0; r < N; r++) {
+                    for (let c = 0; c < N; c++) {
+                        const btn = document.createElement('button');
+                        btn.className = 'cell';
+                        btn.setAttribute('data-r', r);
+                        btn.setAttribute('data-c', c);
+                        btn.addEventListener('click', onCellClick);
+                        const sub = document.createElement('div');
+                        sub.className = 'sub';
+                        sub.textContent = `${r + 1},${c + 1}`;
+                        btn.appendChild(sub);
+                        boardEl.appendChild(btn);
+                    }
+                }
+                candidates = new Set(allCells().map(p => key(p.r, p.c)));
+                fixedDiamond = null;
+                clicks = 0;
+                reveals = 0;
+                guessModeEl.checked = false;
+                updateCandidatesUI();
+                updateStats();
+                logEl.innerHTML = '';
+                log(`Game started. Candidates: ${candidates.size}.`);
+            }
+
+            function updateStats() {
+                clicksEl.textContent = clicks;
+                revealsEl.textContent = reveals;
+                candsEl.textContent = candidates.size;
+                statusEl.textContent = fixedDiamond ? `Fixed @ (${fixedDiamond.r + 1},${fixedDiamond.c + 1})` : 'Unfixed';
+                guessModeEl.disabled = !fixedDiamond;
+            }
+
+            function updateCandidatesUI() {
+                [...boardEl.children].forEach(cell => {
+                    const r = +cell.getAttribute('data-r');
+                    const c = +cell.getAttribute('data-c');
+                    const isCand = candidates.has(key(r, c));
+                    cell.classList.toggle('candidate', isCand);
+                });
+            }
+
+            function setCellContent(r, c, content, type) {
+                const idx = r * N + c;
+                const cell = boardEl.children[idx];
+                cell.textContent = content;
+                const sub = document.createElement('div');
+                sub.className = 'sub';
+                sub.textContent = `${r + 1},${c + 1}`;
+                cell.appendChild(sub);
+                cell.classList.add('revealed');
+                cell.classList.remove('hit', 'miss');
+                if (type === 'hit') cell.classList.add('hit');
+                if (type === 'miss') cell.classList.add('miss');
+            }
+
+            function feasibleDistancesFrom(cell) {
+                const max = farthestDistanceFrom(cell);
+                const feasible = [];
+                for (let d = 3; d <= max; d++) {
+                    const inter = cellsAtDistanceFrom(cell, d, candidates);
+                    if (inter.length > 0) feasible.push({ d, count: inter.length });
+                }
+                return { max, feasible };
+            }
+
+            function onCellClick(e) {
+                const r = +e.currentTarget.getAttribute('data-r');
+                const c = +e.currentTarget.getAttribute('data-c');
+                const here = { r, c };
+                clicks++;
+
+                // Guess mode
+                if (guessModeEl.checked && fixedDiamond) {
+                    if (fixedDiamond.r === r && fixedDiamond.c === c) {
+                        setCellContent(r, c, '💎', 'hit');
+                        log(`You found the diamond in ${clicks} moves!`);
+                        endGame();
+                    } else {
+                        const d = manhattan(here, fixedDiamond);
+                        setCellContent(r, c, d, 'miss');
+                        reveals++;
+                        log(`Guess miss at (${r + 1},${c + 1}). True distance: ${d}.`);
+                    }
+                    updateStats();
+                    return;
+                }
+
+                // Clue mode after fixed
+                if (fixedDiamond) {
+                    const d = manhattan(here, fixedDiamond);
+                    if (d === 0) {
+                        setCellContent(r, c, '💎', 'hit');
+                        log(`You found the diamond in ${clicks} moves!`);
+                        updateStats();
+                        //endGame();
+                    } else {
+                        setCellContent(r, c, d);
+                        reveals++;
+                        log(`Clue @ (${r + 1},${c + 1}) → distance ${d}.`);
+                    }
+                    updateStats();
+                    return;
+                }
+
+                // Clue mode before fixed
+                const { feasible } = feasibleDistancesFrom(here);
+                if (feasible.length === 0) {
+                    alert("1");
+                    setCellNumber(r, c, '🚫', 'no-clue');
+                    log(`No clue possible from (${r + 1},${c + 1}). 🚫`);
+                    clicks--;
+                    return;
+                }
+                const pick = randChoice(feasible).d;
+                if (pick === 0) { // Found diamond by chance
+                    setCellContent(r, c, '💎', 'hit');
+                    log(`You found the diamond in ${clicks} moves!`);
+                    endGame();
+                    updateStats();
+                    return;
+                }
+                setCellContent(r, c, pick);
+                reveals++;
+                candidates = new Set(cellsAtDistanceFrom(here, pick, candidates).map(p => key(p.r, p.c)));
+                log(`Clue @ (${r + 1},${c + 1}) → ${pick}. Candidates now ${candidates.size}.`);
+
+                // If exactly one remains, fix the diamond and notify the player
+                if (candidates.size === 1) {
+                    fixedDiamond = parseKey([...candidates][0]);
+                    log(`Diamond fixed at (${fixedDiamond.r + 1},${fixedDiamond.c + 1}). You can find it in your next click! 🎯`);
+                }
+
+
+                updateCandidatesUI();
+                updateStats();
+            }
+
+
+
+            function endGame() {
+                [...boardEl.children].forEach(btn => btn.disabled = true);
+            }
+
+            function log(msg, warn = false) {
+                const el = document.createElement('div');
+                el.textContent = msg;
+                if (warn) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge';
+                    badge.textContent = 'note';
+                    el.appendChild(badge);
+                }
+                logEl.prepend(el);
+            }
+
+            newGameBtn.addEventListener('click', () => init());
+            clearMarksBtn.addEventListener('click', () => {
+                [...boardEl.children].forEach((cell, idx) => {
+                    const r = Math.floor(idx / N), c = idx % N;
+                    cell.classList.remove('revealed', 'hit', 'miss');
+                    cell.textContent = '';
+                    const sub = document.createElement('div');
+                    sub.className = 'sub';
+                    sub.textContent = `${r + 1},${c + 1}`;
+                    cell.appendChild(sub);
+                });
+                log('Cleared visible numbers. Progress retained.');
+            });
+
+            init();
+        })();
+    </script>
+
+
+
+</body>
+
+</html>
