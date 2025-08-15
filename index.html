@@ -150,7 +150,9 @@
         </select>
         <button id="newGameBtn">New Game</button>
     </div>
-    <div id="clicks">Penalty Moves: 0</div>
+    <div><span id="clicks">Penalty Moves: 0</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <span id="diamondMoves">Diamond Spawn Moves: 0</span></div>
     <div id="message" class="message"></div>
     <div id="board"></div>
 
@@ -159,6 +161,7 @@
         let candidates = new Set();
         let fixedDiamond = null;
         let penaltyMoves = 0;
+        let diamondSpawnMoves = 0; // NEW: counts moves until diamond location known
 
         const sizeSelect = document.getElementById('boardSize');
         const newGameBtn = document.getElementById('newGameBtn');
@@ -180,14 +183,15 @@
             }
         }
 
-
         function initGame(size = 5) {
             N = size;
             sizeSelect.value = String(N);
 
             penaltyMoves = 0;
+            diamondSpawnMoves = 0; // reset
             fixedDiamond = null;
             document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
+            document.getElementById('diamondMoves').textContent = `Diamond Spawn Moves: ${diamondSpawnMoves}`;
             setMessage("Click a cell to get a distance clue!");
 
             buildBoard(N);
@@ -290,6 +294,8 @@
             if (feasible.length === 0) {
                 playSound('soundNoClue');
                 setCellNumber(r, c, '🚫', 'no-clue');
+                diamondSpawnMoves++; // counts this move
+                document.getElementById('diamondMoves').textContent = `Diamond Spawn Moves: ${diamondSpawnMoves}`;
                 return;
             }
 
@@ -297,6 +303,12 @@
             setCellNumber(r, c, clue, 'clicked');
 
             candidates = new Set([...candidates].filter(k => distance(currentCell, parseKey(k)) === clue));
+
+            // Increment diamond spawn moves until diamond is known
+            if (!fixedDiamond) {
+                diamondSpawnMoves++;
+                document.getElementById('diamondMoves').textContent = `Diamond Spawn Moves: ${diamondSpawnMoves}`;
+            }
 
             if (candidates.size === 1) {
                 fixedDiamond = parseKey([...candidates][0]);
