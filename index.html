@@ -41,7 +41,7 @@
 
         table {
             border-spacing: 12px;
-            /* bigger gap */
+            /* bigger gap between cells */
             margin: 0 auto 15px;
         }
 
@@ -127,14 +127,14 @@
 
     <h1>💎 Grid Quest</h1>
     <div class="toolbar">
-        <label>Board size:</label>
-        <select id="boardSize" >
+        <label for="boardSize">Board size:</label>
+        <select id="boardSize">
             <option value="5">5x5</option>
             <option value="6">6x6</option>
             <option value="7">7x7</option>
             <option value="8">8x8</option>
         </select>
-        <button onclick="initGame(parseInt(document.getElementById('boardSize').value))">New Game</button>
+        <button id="newGameBtn">New Game</button>
     </div>
     <div id="clicks">Penalty Moves: 0</div>
     <div id="message" class="message"></div>
@@ -146,13 +146,31 @@
         let fixedDiamond = null;
         let penaltyMoves = 0;
 
+        const sizeSelect = document.getElementById('boardSize');
+        const newGameBtn = document.getElementById('newGameBtn');
+
+        newGameBtn.addEventListener('click', () => {
+            initGame(parseInt(sizeSelect.value, 10));
+        });
+
+        // IMPORTANT: selecting a different size triggers a fresh game immediately
+        sizeSelect.addEventListener('change', (e) => {
+            const size = parseInt(e.target.value, 10);
+            initGame(size);
+        });
+
         function initGame(size = 5) {
             N = size;
+            // keep the dropdown in sync even if initGame is called elsewhere
+            sizeSelect.value = String(N);
+
             penaltyMoves = 0;
             fixedDiamond = null;
             document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
             setMessage("Click a cell to get a distance clue!");
+
             buildBoard(N);
+
             candidates.clear();
             for (let r = 0; r < N; r++) {
                 for (let c = 0; c < N; c++) {
@@ -196,7 +214,7 @@
         }
 
         function onCellClick(r, c, cellEl) {
-            // Clear old no-clue icons
+            // Clear previous "no clue" icons as requested
             document.querySelectorAll('td.no-clue').forEach(td => {
                 td.textContent = '';
                 td.classList.remove('no-clue');
@@ -204,6 +222,7 @@
 
             const currentCell = [r, c];
 
+            // If diamond location known: only count penalty moves until found
             if (fixedDiamond) {
                 const d = distance(currentCell, fixedDiamond);
                 if (d === 0) {
@@ -222,6 +241,7 @@
                 return;
             }
 
+            // Before fixed: generate a feasible clue (min=3, Manhattan, exclude diagonals)
             const maxDist = maxDistanceFrom(r, c);
             const minDist = 3;
             const feasible = [];
@@ -232,6 +252,7 @@
             }
 
             if (feasible.length === 0) {
+                // Show the not-possible icon
                 setCellNumber(r, c, '🚫', 'no-clue');
                 return;
             }
@@ -239,9 +260,10 @@
             const clue = feasible[Math.floor(Math.random() * feasible.length)];
             setCellNumber(r, c, clue, 'clicked');
 
-            // Reduce candidates
+            // Reduce candidates to those at exactly that distance
             candidates = new Set([...candidates].filter(k => distance(currentCell, parseKey(k)) === clue));
 
+            // If exactly one remains, location is known
             if (candidates.size === 1) {
                 fixedDiamond = parseKey([...candidates][0]);
                 setMessage(`💡 The diamond’s location is known! Find it with as few extra moves as possible!`);
@@ -271,7 +293,8 @@
             }
         }
 
-        initGame();
+        // Start with whatever is selected by default
+        initGame(parseInt(sizeSelect.value, 10));
     </script>
 
 </body>
