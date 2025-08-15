@@ -4,6 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Grid Quest</title>
+
+    <audio id="soundClick" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+    <audio id="soundNoClue" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+    <audio id="soundDiamond" src="https://actions.google.com/sounds/v1/cartoon/tympani_bing.ogg"></audio>
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -11,6 +16,29 @@
             text-align: center;
             margin: 0;
             padding: 0;
+        }
+
+        /* Toolbar buttons */
+        .toolbar select,
+        .toolbar button {
+            font-size: 16px;
+            padding: 6px 10px;
+            margin: 0 5px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #fff8e1;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .toolbar select:hover,
+        .toolbar button:hover {
+            background: #ffe0a1;
+        }
+
+        .toolbar button:active {
+            background-color: #d5d5d5;
+            transform: scale(0.98);
         }
 
         h1 {
@@ -23,49 +51,35 @@
             margin-bottom: 15px;
         }
 
-        select,
-        button {
-            font-size: 16px;
-            padding: 6px 10px;
-            margin: 0 5px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            background: #fff8e1;
-            cursor: pointer;
-        }
-
-        select:hover,
-        button:hover {
-            background: #ffe0a1;
-        }
-
         table {
-            border-spacing: 12px;
-            /* bigger gap between cells */
             margin: 0 auto 15px;
         }
 
-        td {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(#fffbe6, #ffe9a9);
-            border-radius: 10px;
+        /* Grid cell flat style */
+        .grid-cell {
+            background-color: #faf4cc;
+            border: 1px solid #b5b4ac;
+            border-radius: 7px;
             text-align: center;
             vertical-align: middle;
-            font-size: 22px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-            transition: transform 0.1s ease, background 0.3s;
+            box-shadow: 0px 0px 0px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.2s ease, transform 0.1s ease;
         }
 
-        td:hover {
+        .grid-cell:hover {
+            background-color: #ffffff;
             transform: scale(1.05);
-            background: linear-gradient(#fff9d9, #ffd97a);
+        }
+
+        .grid-cell:active {
+            background-color: #d5d5d5;
+            transform: scale(0.98);
         }
 
         td.clicked {
-            background: #fff3b0;
+            background: #fff3b0 !important;
         }
 
         td.no-clue {
@@ -153,15 +167,22 @@
             initGame(parseInt(sizeSelect.value, 10));
         });
 
-        // IMPORTANT: selecting a different size triggers a fresh game immediately
         sizeSelect.addEventListener('change', (e) => {
             const size = parseInt(e.target.value, 10);
             initGame(size);
         });
 
+        function playSound(id) {
+            const audio = document.getElementById(id);
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play();
+            }
+        }
+
+
         function initGame(size = 5) {
             N = size;
-            // keep the dropdown in sync even if initGame is called elsewhere
             sizeSelect.value = String(N);
 
             penaltyMoves = 0;
@@ -181,10 +202,25 @@
 
         function buildBoard(size) {
             const table = document.createElement('table');
+            const baseSize = 60;
+            const stepDown = 6;
+            const baseSpacing = 10;
+            const spacingStep = 2;
+
+            const cellSize = baseSize - (size - 5) * stepDown;
+            const spacing = baseSpacing - (size - 5) * spacingStep;
+
+            table.style.borderSpacing = spacing + 'px';
+            table.style.margin = '0 auto 15px';
+
             for (let r = 0; r < size; r++) {
                 const tr = document.createElement('tr');
                 for (let c = 0; c < size; c++) {
                     const td = document.createElement('td');
+                    td.classList.add('grid-cell');
+                    td.style.width = cellSize + 'px';
+                    td.style.height = cellSize + 'px';
+                    td.style.fontSize = Math.floor(cellSize * 0.37) + 'px';
                     td.dataset.r = r;
                     td.dataset.c = c;
                     td.addEventListener('click', () => onCellClick(r, c, td));
@@ -192,6 +228,7 @@
                 }
                 table.appendChild(tr);
             }
+
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
             boardDiv.appendChild(table);
@@ -214,7 +251,6 @@
         }
 
         function onCellClick(r, c, cellEl) {
-            // Clear previous "no clue" icons as requested
             document.querySelectorAll('td.no-clue').forEach(td => {
                 td.textContent = '';
                 td.classList.remove('no-clue');
@@ -222,10 +258,10 @@
 
             const currentCell = [r, c];
 
-            // If diamond location known: only count penalty moves until found
             if (fixedDiamond) {
                 const d = distance(currentCell, fixedDiamond);
                 if (d === 0) {
+                    playSound('soundDiamond');
                     setCellNumber(r, c, '💎', 'hit');
                     spawnSparkles(cellEl);
                     if (penaltyMoves === 0) {
@@ -234,6 +270,7 @@
                         setMessage(`🎉 You found the diamond with ${penaltyMoves} penalty move${penaltyMoves > 1 ? 's' : ''}.`);
                     }
                 } else {
+                    playSound('soundClick');
                     penaltyMoves++;
                     document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
                     setCellNumber(r, c, d, 'clicked');
@@ -241,7 +278,6 @@
                 return;
             }
 
-            // Before fixed: generate a feasible clue (min=3, Manhattan, exclude diagonals)
             const maxDist = maxDistanceFrom(r, c);
             const minDist = 3;
             const feasible = [];
@@ -252,7 +288,7 @@
             }
 
             if (feasible.length === 0) {
-                // Show the not-possible icon
+                playSound('soundNoClue');
                 setCellNumber(r, c, '🚫', 'no-clue');
                 return;
             }
@@ -260,10 +296,8 @@
             const clue = feasible[Math.floor(Math.random() * feasible.length)];
             setCellNumber(r, c, clue, 'clicked');
 
-            // Reduce candidates to those at exactly that distance
             candidates = new Set([...candidates].filter(k => distance(currentCell, parseKey(k)) === clue));
 
-            // If exactly one remains, location is known
             if (candidates.size === 1) {
                 fixedDiamond = parseKey([...candidates][0]);
                 setMessage(`💡 The diamond’s location is known! Find it with as few extra moves as possible!`);
@@ -293,7 +327,6 @@
             }
         }
 
-        // Start with whatever is selected by default
         initGame(parseInt(sizeSelect.value, 10));
     </script>
 
