@@ -6,86 +6,74 @@
     <title>Grid Quest</title>
     <style>
         body {
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f4f0e6;
+            text-align: center;
             margin: 0;
-            background: linear-gradient(135deg, #fdfcfb, #e2d1c3);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
+            padding: 0;
         }
 
         h1 {
-            margin: 10px 0;
-            font-size: 2.2em;
-            color: #6b4f2a;
-            text-shadow: 1px 1px 0 #fff;
-        }
-
-        .game-container {
-            background: #fff8e7;
-            border-radius: 15px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-            padding: 20px 30px;
-            text-align: center;
-            max-width: 500px;
-            width: 100%;
-        }
-
-        #message {
-            background: #f4e1b6;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            min-height: 24px;
-            font-weight: bold;
+            margin: 20px 0 5px;
             color: #5a3e1b;
+            text-shadow: 1px 1px 2px #d9c6a5;
         }
 
-        #clicks {
-            font-weight: bold;
-            margin: 5px 0 15px;
+        .toolbar {
+            margin-bottom: 15px;
+        }
+
+        select,
+        button {
+            font-size: 16px;
+            padding: 6px 10px;
+            margin: 0 5px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #fff8e1;
+            cursor: pointer;
+        }
+
+        select:hover,
+        button:hover {
+            background: #ffe0a1;
         }
 
         table {
             border-spacing: 12px;
+            /* bigger gap */
             margin: 0 auto 15px;
         }
 
         td {
             width: 60px;
             height: 60px;
-            background: linear-gradient(145deg, #fff, #ddd);
-            border-radius: 12px;
+            background: linear-gradient(#fffbe6, #ffe9a9);
+            border-radius: 10px;
             text-align: center;
-            font-size: 1.4em;
+            vertical-align: middle;
+            font-size: 22px;
             font-weight: bold;
-            color: #333;
             cursor: pointer;
-            transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
-            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.15);
-            position: relative;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease, background 0.3s;
         }
 
         td:hover {
             transform: scale(1.05);
-            background: linear-gradient(145deg, #f7f7f7, #e3e3e3);
-            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(#fff9d9, #ffd97a);
         }
 
         td.clicked {
-            background: linear-gradient(145deg, #d4edda, #c3e6cb);
-            color: #155724;
+            background: #fff3b0;
         }
 
         td.no-clue {
-            background: linear-gradient(145deg, #f8d7da, #f5c6cb);
-            color: #721c24;
+            background: #ffe5e5 !important;
         }
 
         td.hit {
-            background: linear-gradient(145deg, gold, #fdd835);
-            color: white;
+            background: gold !important;
             animation: diamondFound 0.6s ease-out;
         }
 
@@ -105,41 +93,30 @@
             }
         }
 
-        button {
-            padding: 10px 20px;
-            background: #6b4f2a;
-            color: white;
-            font-size: 1em;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
-            transition: background 0.2s;
+        .message {
+            font-size: 18px;
+            margin: 10px;
+            padding: 8px;
+            display: inline-block;
+            background: #fff8dc;
+            border-radius: 6px;
+            box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
         }
 
-        button:hover {
-            background: #8c6b3a;
-        }
-
-        /* Sparkle animation */
         .sparkle {
             position: absolute;
-            width: 6px;
-            height: 6px;
-            background: white;
-            border-radius: 50%;
-            animation: sparkleMove 0.8s ease-out forwards;
             pointer-events: none;
+            animation: sparkle 1s ease-out forwards;
         }
 
-        @keyframes sparkleMove {
-            0% {
-                transform: translate(0, 0) scale(1);
+        @keyframes sparkle {
+            from {
+                transform: scale(1);
                 opacity: 1;
             }
 
-            100% {
-                transform: translate(var(--dx), var(--dy)) scale(0);
+            to {
+                transform: scale(2);
                 opacity: 0;
             }
         }
@@ -149,102 +126,73 @@
 <body>
 
     <h1>💎 Grid Quest</h1>
-    <div class="game-container">
-        <div id="message">Click a cell to start your quest!</div>
-        <div id="clicks">Moves: 0</div>
-        <table id="board"></table>
-        <button onclick="newGame()">New Game</button>
+    <div class="toolbar">
+        <label>Board size:</label>
+        <select id="boardSize" >
+            <option value="5">5x5</option>
+            <option value="6">6x6</option>
+            <option value="7">7x7</option>
+            <option value="8">8x8</option>
+        </select>
+        <button onclick="initGame(parseInt(document.getElementById('boardSize').value))">New Game</button>
     </div>
+    <div id="clicks">Penalty Moves: 0</div>
+    <div id="message" class="message"></div>
+    <div id="board"></div>
 
     <script>
-        const N = 5;
-        let clicks, candidates, fixedDiamond;
+        let N = 5;
+        let candidates = new Set();
+        let fixedDiamond = null;
+        let penaltyMoves = 0;
 
-        function initGame() {
+        function initGame(size = 5) {
+            N = size;
             penaltyMoves = 0;
-            document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
-
-            clicks = 0;
             fixedDiamond = null;
-            candidates = new Set();
+            document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
+            setMessage("Click a cell to get a distance clue!");
+            buildBoard(N);
+            candidates.clear();
             for (let r = 0; r < N; r++) {
                 for (let c = 0; c < N; c++) {
                     candidates.add(key(r, c));
                 }
             }
-            document.getElementById('clicks').textContent = `Moves: ${clicks}`;
-            setMessage('Click a cell to start your quest!');
-            createBoard();
         }
 
-        function newGame() {
-            initGame();
-        }
-
-        const key = (r, c) => `${r},${c}`;
-        const parseKey = k => { const [r, c] = k.split(',').map(Number); return { r, c }; };
-
-        function createBoard() {
-            const board = document.getElementById('board');
-            board.innerHTML = '';
-            for (let r = 0; r < N; r++) {
-                const row = document.createElement('tr');
-                for (let c = 0; c < N; c++) {
-                    const cell = document.createElement('td');
-                    cell.dataset.r = r;
-                    cell.dataset.c = c;
-                    cell.addEventListener('click', () => onCellClick(r, c, cell));
-                    row.appendChild(cell);
+        function buildBoard(size) {
+            const table = document.createElement('table');
+            for (let r = 0; r < size; r++) {
+                const tr = document.createElement('tr');
+                for (let c = 0; c < size; c++) {
+                    const td = document.createElement('td');
+                    td.dataset.r = r;
+                    td.dataset.c = c;
+                    td.addEventListener('click', () => onCellClick(r, c, td));
+                    tr.appendChild(td);
                 }
-                board.appendChild(row);
+                table.appendChild(tr);
             }
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            boardDiv.appendChild(table);
         }
 
+        function key(r, c) { return `${r},${c}`; }
+        function parseKey(k) { return k.split(',').map(Number); }
+        function distance([r1, c1], [r2, c2]) {
+            return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+        }
+        function setMessage(msg) {
+            document.getElementById('message').textContent = msg;
+        }
         function setCellNumber(r, c, value, cls) {
             const cell = document.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
             if (!cell) return;
             cell.textContent = value;
-            if (cls) {
-                cell.classList.remove('no-clue', 'clicked', 'hit');
-                cell.classList.add(cls);
-            }
-        }
-
-        function distance(a, b) {
-            return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
-        }
-
-        function farthestDistanceFrom(cell) {
-            let max = 0;
-            for (let r = 0; r < N; r++) {
-                for (let c = 0; c < N; c++) {
-                    max = Math.max(max, distance(cell, { r, c }));
-                }
-            }
-            return max;
-        }
-
-        function cellsAtDistanceFrom(cell, dist, pool) {
-            const res = [];
-            for (let k of pool) {
-                const p = parseKey(k);
-                if (distance(cell, p) === dist) res.push(k);
-            }
-            return res;
-        }
-
-        function spawnSparkles(cell) {
-            const numSparkles = 12;
-            for (let i = 0; i < numSparkles; i++) {
-                const sparkle = document.createElement('div');
-                sparkle.className = 'sparkle';
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 25 + Math.random() * 20;
-                sparkle.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
-                sparkle.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
-                cell.appendChild(sparkle);
-                setTimeout(() => sparkle.remove(), 800);
-            }
+            cell.classList.remove('no-clue', 'hit', 'clicked');
+            if (cls) cell.classList.add(cls);
         }
 
         function onCellClick(r, c, cellEl) {
@@ -254,10 +202,7 @@
                 td.classList.remove('no-clue');
             });
 
-            clicks++;
-            document.getElementById('clicks').textContent = `Moves: ${clicks}`;
-
-            const currentCell = { r, c };
+            const currentCell = [r, c];
 
             if (fixedDiamond) {
                 const d = distance(currentCell, fixedDiamond);
@@ -272,44 +217,63 @@
                 } else {
                     penaltyMoves++;
                     document.getElementById('clicks').textContent = `Penalty Moves: ${penaltyMoves}`;
-                    cellEl.textContent = d;
-                    cellEl.classList.add('clicked');
+                    setCellNumber(r, c, d, 'clicked');
                 }
                 return;
             }
-            const max = farthestDistanceFrom(currentCell);
+
+            const maxDist = maxDistanceFrom(r, c);
+            const minDist = 3;
             const feasible = [];
-            for (let d = 3; d <= max; d++) {
-                const inter = cellsAtDistanceFrom(currentCell, d, candidates);
-                if (inter.length > 0) feasible.push(d);
+            for (let d = minDist; d <= maxDist; d++) {
+                if ([...candidates].some(k => distance(currentCell, parseKey(k)) === d)) {
+                    feasible.push(d);
+                }
             }
 
             if (feasible.length === 0) {
                 setCellNumber(r, c, '🚫', 'no-clue');
-                setMessage(`No clue possible from (${r + 1},${c + 1}) 🚫`);
                 return;
             }
 
-            const chosenDist = feasible[Math.floor(Math.random() * feasible.length)];
-            const possibleCells = cellsAtDistanceFrom(currentCell, chosenDist, candidates);
+            const clue = feasible[Math.floor(Math.random() * feasible.length)];
+            setCellNumber(r, c, clue, 'clicked');
 
-            setCellNumber(r, c, chosenDist, 'clicked');
-            candidates = new Set(possibleCells);
+            // Reduce candidates
+            candidates = new Set([...candidates].filter(k => distance(currentCell, parseKey(k)) === clue));
 
             if (candidates.size === 1) {
                 fixedDiamond = parseKey([...candidates][0]);
                 setMessage(`💡 The diamond’s location is known! Find it with as few extra moves as possible!`);
-            } else {
-                setMessage(`The diamond is exactly ${chosenDist} steps away from (${r + 1},${c + 1})`);
             }
         }
 
-        function setMessage(msg) {
-            document.getElementById('message').textContent = msg;
+        function maxDistanceFrom(r, c) {
+            let max = 0;
+            for (let r2 = 0; r2 < N; r2++) {
+                for (let c2 = 0; c2 < N; c2++) {
+                    max = Math.max(max, distance([r, c], [r2, c2]));
+                }
+            }
+            return max;
+        }
+
+        function spawnSparkles(cellEl) {
+            const rect = cellEl.getBoundingClientRect();
+            for (let i = 0; i < 10; i++) {
+                const s = document.createElement('div');
+                s.className = 'sparkle';
+                s.textContent = '✨';
+                s.style.left = rect.left + Math.random() * rect.width + 'px';
+                s.style.top = rect.top + Math.random() * rect.height + 'px';
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 1000);
+            }
         }
 
         initGame();
     </script>
+
 </body>
 
 </html>
