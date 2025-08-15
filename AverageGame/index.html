@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Average Puzzle Game</title>
+  <style>
+    .cell {
+      background: white;
+      border: 1px solid #ccc;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 60px;
+      width: 60px;
+      position: relative;
+      /* ✅ Needed for corner label */
+      user-select: none;
+    }
+
+    .cell-label {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: 10px;
+      color: #888;
+      /* light grey so it’s not distracting */
+    }
+
+
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      margin-top: 10px;
+    }
+
+    #controls {
+      margin: 10px;
+    }
+
+    .grid {
+      display: grid;
+      margin: 20px auto;
+      gap: 5px;
+      touch-action: none;
+      justify-content: center;
+      /* ✅ Center the grid horizontally */
+    }
+
+    .cell {
+      background: white;
+      border: 1px solid #ccc;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 60px;
+      width: 60px;
+      user-select: none;
+    }
+
+    .selected {
+      background-color: #87cefa;
+    }
+
+    #message {
+      font-size: 18px;
+      margin: 10px;
+      color: green;
+    }
+
+    button {
+      margin: 5px;
+      padding: 8px 16px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Average Puzzle Game</h1>
+  <div id="controls">
+    <button onclick="init(3)">3x3</button>
+    <button onclick="init(4)">4x4</button>
+    <button onclick="init(5)">5x5</button>
+    <button onclick="init(6)">6x6</button>
+  </div>
+  <div id="message"></div>
+  <div id="grid" class="grid"></div>
+  <div style="margin: 20px auto; width: 300px;">
+    <h3>Solver</h3>
+    <div id="move-log" style="text-align:left; font-family:monospace;"></div>
+  </div>
+
+
+
+  <audio id="positive-sound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+  <audio id="negative-sound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+  <audio id="win-sound" src="https://actions.google.com/sounds/v1/cartoon/tympani_bing.ogg"></audio>
+
+  <script>
+    let moveLog = []; // Store move history
+    let generatedMoveLog = []; // to log generated board moves
+
+
+    let gridSize = 5;
+    let board = [];
+    let grid = document.getElementById("grid");
+    let message = document.getElementById("message");
+
+    const posSound = document.getElementById("positive-sound");
+    const negSound = document.getElementById("negative-sound");
+    const winSound = document.getElementById("win-sound");
+
+    let isDragging = false;
+    let selected = [];
+
+    function init(size) {
+      gridSize = size;
+      generatedMoveLog = []; // 🔄 Clear previous generated moves
+      board = generateSolvableBoard(size);
+      showGeneratedMoves();
+      render();
+    }
+
+    function generateSolvableBoard(size) {
+      let initialValue = size === 3 ? 5 : 13;
+      let board2D = Array.from({ length: size }, () => Array(size).fill(initialValue));
+      let attempts = 0;
+
+      while (attempts < 100) {
+        let validMoves = [];
+
+        // Horizontal same-value groups
+        for (let r = 0; r < size; r++) {
+          let c = 0;
+          while (c < size) {
+            let val = board2D[r][c];
+            let start = c;
+            while (c < size && board2D[r][c] === val) c++;
+            let length = c - start;
+            if (length >= 3) {
+              validMoves.push({ dir: 'H', row: r, col: start, length });
+            }
+          }
+        }
+
+        // Vertical same-value groups
+        for (let c = 0; c < size; c++) {
+          let r = 0;
+          while (r < size) {
+            let val = board2D[r][c];
+            let start = r;
+            while (r < size && board2D[r][c] === val) r++;
+            let length = r - start;
+            if (length >= 3) {
+              validMoves.push({ dir: 'V', row: start, col: c, length });
+            }
+          }
+        }
+
+        if (validMoves.length === 0) break;
+
+        let move = validMoves[Math.floor(Math.random() * validMoves.length)];
+        let moveLength = Math.floor(Math.random() * (move.length - 2)) + 3; // 3 to max group length
+
+        let cells = [];
+        if (move.dir === 'H') {
+          for (let i = 0; i < moveLength; i++) {
+            cells.push([move.row, move.col + i]);
+          }
+        } else {
+          for (let i = 0; i < moveLength; i++) {
+            cells.push([move.row + i, move.col]);
+          }
+        }
+
+        let total = moveLength * initialValue;
+        let vals = [];
+        let remaining = total;
+        for (let i = 0; i < moveLength - 1; i++) {
+          let v = Math.floor(Math.random() * (remaining - (moveLength - 1 - i))) + 1;
+          vals.push(v);
+          remaining -= v;
+        }
+        vals.push(remaining);
+
+        for (let i = 0; i < moveLength; i++) {
+          let [r, c] = cells[i];
+          board2D[r][c] = vals[i];
+        }
+
+        let from = `(${cells[0][0]}, ${cells[0][1]})`;
+        let to = `(${cells[cells.length - 1][0]}, ${cells[cells.length - 1][1]})`;
+        generatedMoveLog.push({ from: to, to: from });
+
+        attempts++;
+      }
+
+      return board2D.flat();
+    }
+
+
+    function render() {
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${gridSize}, 60px)`;
+      board.forEach((val, i) => {
+        let cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.index = i;
+
+        // Main number
+        cell.textContent = val;
+
+        // Label in corner
+        let labelSpan = document.createElement("span");
+        labelSpan.className = "cell-label";
+        labelSpan.textContent = indexToLabel(i);
+        cell.appendChild(labelSpan);
+
+        cell.addEventListener("mousedown", startDrag);
+        cell.addEventListener("mouseover", dragOver);
+        cell.addEventListener("mouseup", endDrag);
+
+        grid.appendChild(cell);
+      });
+      message.textContent = '';
+    }
+
+
+
+    function startDrag(e) {
+      isDragging = true;
+      selected = [parseInt(e.target.dataset.index)];
+      highlight();
+    }
+
+    function dragOver(e) {
+      if (!isDragging) return;
+      let idx = parseInt(e.target.dataset.index);
+      if (!selected.includes(idx)) {
+        selected.push(idx);
+        highlight();
+      }
+    }
+
+    function endDrag() {
+      isDragging = false;
+      if (selected.length >= 3 && validLine(selected)) {
+        let values = selected.map(i => board[i]);
+        let avg = values.reduce((a, b) => a + b, 0) / values.length;
+        if (Number.isInteger(avg)) {
+          selected.forEach(i => board[i] = avg);
+          posSound.play();
+          logMove(selected); // 👈 Log the move
+          checkSolved();
+        } else {
+          negSound.play();
+        }
+      } else {
+        negSound.play();
+      }
+      selected = [];
+      highlight();
+      render();
+    }
+
+    function highlight() {
+      document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+      selected.forEach(i => {
+        document.querySelector(`.cell[data-index='${i}']`)?.classList.add("selected");
+      });
+    }
+
+    function validLine(indices) {
+      let rows = indices.map(i => Math.floor(i / gridSize));
+      let cols = indices.map(i => i % gridSize);
+      let allSameRow = rows.every(r => r === rows[0]);
+      let allSameCol = cols.every(c => c === cols[0]);
+
+      if (allSameRow) {
+        indices.sort((a, b) => a - b);
+        for (let i = 1; i < indices.length; i++) {
+          if (indices[i] !== indices[i - 1] + 1) return false;
+        }
+        return true;
+      } else if (allSameCol) {
+        indices.sort((a, b) => a - b);
+        for (let i = 1; i < indices.length; i++) {
+          if (indices[i] !== indices[i - 1] + gridSize) return false;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function checkSolved() {
+      if (board.every(v => v === board[0])) {
+        winSound.play();
+        message.textContent = "🎉 Solved!";
+        alert("🎉 Solved!");
+      }
+    }
+
+    function logMove(indices) {
+      if (indices.length < 2) return;
+      let sorted = [...indices].sort((a, b) => a - b);
+      let fromIdx = sorted[0];
+      let toIdx = sorted[sorted.length - 1];
+      let from = indexToLabel(fromIdx);
+      let to = indexToLabel(toIdx);
+      moveLog.unshift({ from, to }); // store if needed, but no UI update
+    }
+
+
+    function updateMoveLogTable() {
+      const tbody = document.getElementById("move-log-body-2");
+      tbody.innerHTML = "";
+      moveLog.forEach(({ from, to }) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${from}</td><td>${to}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    function showGeneratedMoves() {
+      const logDiv = document.getElementById("move-log");
+      logDiv.innerHTML = "";
+      for (let i = generatedMoveLog.length - 1; i >= 0; i--) {
+        const { from, to } = generatedMoveLog[i];
+        let fromParts = from.match(/\d+/g).map(Number);
+        let toParts = to.match(/\d+/g).map(Number);
+        let fromIndex = fromParts[0] * gridSize + fromParts[1];
+        let toIndex = toParts[0] * gridSize + toParts[1];
+        logDiv.innerHTML += `${indexToLabel(fromIndex)} → ${indexToLabel(toIndex)}<br>`;
+      }
+    }
+
+
+
+
+
+    // Convert index to alphabet label like A, B, ..., Z, AA, AB, ...
+    function indexToLabel(index) {
+      let label = "";
+      index++; // 1-based
+      while (index > 0) {
+        let mod = (index - 1) % 26;
+        label = String.fromCharCode(65 + mod) + label;
+        index = Math.floor((index - 1) / 26);
+      }
+      return label;
+    }
+
+    init(5); // Default 5x5
+  </script>
+</body>
+
+</html>
